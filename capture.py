@@ -13,7 +13,8 @@ def run(*args, required=True):
     print('RUN ' + ' '.join(args), flush=True)
     with tempfile.TemporaryFile(mode='w+') as log:
         try:
-            result = subprocess.run(args, text=True, stdout=log, stderr=log, timeout=120)
+            limit = 360 if 'bootstatus' in args else 120
+            result = subprocess.run(args, text=True, stdout=log, stderr=log, timeout=limit)
         except subprocess.TimeoutExpired:
             log.seek(0)
             details = log.read()
@@ -33,7 +34,7 @@ matches = [(runtime, d) for runtime, group in devices['devices'].items()
            for d in group if 'Duo' in d['name'] and d.get('isAvailable', True)]
 if not matches:
     raise RuntimeError('No available official iPhone Duo simulator in this runner image')
-runtime, device = sorted(matches, key=lambda item: item[0])[0]
+runtime, device = sorted(matches, key=lambda item: item[0], reverse=True)[0]
 udid = device['udid']
 metadata = {'device': device['name'], 'runtime': runtime,
             'environment': 'GitHub-hosted official Apple simulator, not physical hardware',
