@@ -3,13 +3,27 @@ import json
 import pathlib
 import struct
 import subprocess
+import tempfile
 import time
 
 out = pathlib.Path('captures')
 out.mkdir(exist_ok=True)
 
 def run(*args, required=True):
-    result = subprocess.run(args, text=True, capture_output=True, timeout=240)
+    print('RUN ' + ' '.join(args), flush=True)
+    with tempfile.TemporaryFile(mode='w+') as log:
+        try:
+            result = subprocess.run(args, text=True, stdout=log, stderr=log, timeout=120)
+        except subprocess.TimeoutExpired:
+            log.seek(0)
+            details = log.read()
+            (out / 'timeout.txt').write_text(' '.join(args) + '\n' + details)
+            print(details[-4000:], flush=True)
+            raise
+        log.seek(0)
+        result.stdout = log.read()
+        result.stderr = result.stdout
+    print(result.stdout[-3000:], flush=True)
     if required and result.returncode:
         raise RuntimeError(f'{args[0:3]}: {result.stderr[-2000:]}')
     return result
@@ -19,13 +33,14 @@ matches = [(runtime, d) for runtime, group in devices['devices'].items()
            for d in group if 'Duo' in d['name'] and d.get('isAvailable', True)]
 if not matches:
     raise RuntimeError('No available official iPhone Duo simulator in this runner image')
-runtime, device = sorted(matches, key=lambda item: item[0], reverse=True)[0]
+runtime, device = sorted(matches, key=lambda item: item[0])[0]
 udid = device['udid']
 metadata = {'device': device['name'], 'runtime': runtime,
             'environment': 'GitHub-hosted official Apple simulator, not physical hardware',
             'application': 'com.apple.Preferences', 'captures': []}
 (out / 'environment.json').write_text(json.dumps(metadata, indent=2))
 print(f"Selected {device['name']} / {runtime}", flush=True)
+run('open', '-a', '/Applications/Xcode.app/Contents/Applications/DeviceHub.app', required=False)
 if device['state'] != 'Booted':
     run('xcrun', 'simctl', 'boot', udid)
 run('xcrun', 'simctl', 'bootstatus', udid, '-b')
