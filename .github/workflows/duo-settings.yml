@@ -1,0 +1,21 @@
+name: Duo Settings screenshot probe
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  capture:
+    runs-on: xcode-27
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Capture Apple Settings
+        run: python3 capture.py
+      - name: Save screenshot and environment evidence
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: duo-settings-probe
+          path: captures/
+          retention-days: 3
+          if-no-files-found: warn
